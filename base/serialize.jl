@@ -64,7 +64,7 @@ serialize(s, x::Bool) = write_as_tag(s, x)
 
 serialize(s, ::Ptr) = error("cannot serialize a pointer")
 
-serialize(s, ::()) = write(s, UInt8(EMPTY_TUPLE_TAG)) # write_as_tag(s, ())
+serialize(s, ::Tuple{}) = write(s, UInt8(EMPTY_TUPLE_TAG)) # write_as_tag(s, ())
 
 function serialize(s, t::Tuple)
     l = length(t)

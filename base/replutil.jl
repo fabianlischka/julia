@@ -170,13 +170,13 @@ function showerror(io::IO, ex::MethodError)
 end
 
 const UNSHOWN_METHODS = ObjectIdDict(
-    which(call, (Type, Any...)) => true
+    which(call, Tuple{Type, Any, ...}) => true
 )
 function show_method_candidates(io::IO, ex::MethodError)
     # Displays the closest candidates of the given function by looping over the
     # functions methods and counting the number of matching arguments.
 
-    lines = Array((IOBuffer, Int), 0)
+    lines = Array(Tuple{IOBuffer, Int}, 0)
     # These functions are special cased to only show if first argument is matched.
     special = ex.f in [convert, getindex, setindex!]
     funcs = [ex.f]

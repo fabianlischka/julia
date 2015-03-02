@@ -226,7 +226,7 @@ end
 
 # It's most efficient to call checkbounds first, then to_index, and finally
 # allocate the output. Hence the different variants.
-_getindex(A, I::(Union(Int,AbstractVector)...)) =
+_getindex(A, I::Tuple{Union(Int,AbstractVector), ...}) =
     _getindex!(similar(A, index_shape(I...)), A, I...)
 
 # The stagedfunction here is just to work around the performance hit
