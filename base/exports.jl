@@ -1099,6 +1099,7 @@ export
     clipboard,
     exit,
     ntuple,
+    replhook,
     quit,
 
 # IP address stuff
