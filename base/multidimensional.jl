@@ -348,7 +348,7 @@ end
 # is desired, in which case we fall back to the div-based algorithm.
 #stagedfunction merge_indexes{T<:Integer}(V, parentindexes::NTuple, parentdims::Dims, linindex::Union(Colon,Range{T}), lindim)
 stagedfunction merge_indexes_in{TT}(V, parentindexes::TT, parentdims::Dims, linindex, lindim)
-    N = length(parentindexes)   # number of parent axes we're merging
+    N = length(parentindexes.parameters)   # number of parent axes we're merging
     N > 0 || throw(ArgumentError("cannot merge empty indexes"))
     lengthexpr = linindex == Colon ? (:(prod(size(V)[lindim:end]))) : (:(length(linindex)))
     L = symbol(string("Istride_", N+1))  # length of V's trailing dimensions
@@ -389,7 +389,7 @@ end
 # will be better using Cartesian macros to avoid the heap and
 # an extra loop.
 stagedfunction merge_indexes_div{TT}(V, parentindexes::TT, parentdims::Dims, linindex, lindim)
-    N = length(parentindexes)
+    N = length(parentindexes.parameters)
     N > 0 || throw(ArgumentError("cannot merge empty indexes"))
     Istride_N = symbol("Istride_$N")
     lengthexpr = :(length(linindex))

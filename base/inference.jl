@@ -327,7 +327,7 @@ function valid_tparam(x::ANY)
         end
         return true
     end
-    return isa(x,Int) || isa(x,Symbol) || isa(x,Bool) || isa(x,Type) || isbits(x)
+    return isa(x,Int) || isa(x,Symbol) || isa(x,Bool) || (!isa(x,Type) && isbits(x))
 end
 
 function extract_simple_tparam(Ai)
@@ -413,7 +413,7 @@ const apply_type_tfunc = function (A, args...)
     catch
         # type instantiation might fail if one of the type parameters
         # doesn't match, which could happen if a type estimate is too coarse
-        appl = args[1]
+        appl = headtype
         uncertain = true
     end
     if type_too_complex(appl,0)

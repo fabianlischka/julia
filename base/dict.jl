@@ -635,7 +635,7 @@ end
 #       therefore not be exported as-is: it's for internal use only.
 macro get!(h, key0, default)
     quote
-        K, V = eltype($(esc(h)))
+        K, V = keytype($(esc(h))), valtype($(esc(h)))
         key = convert(K, $(esc(key0)))
         if !isequal(key, $(esc(key0)))
             throw(ArgumentError(string($(esc(key0)), " is not a valid key for type ", K)))
