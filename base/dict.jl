@@ -189,12 +189,13 @@ function merge!(d::Associative, others::Associative...)
     end
     return d
 end
+keytype{K,V}(::Associative{K,V}) = K
+valtype{K,V}(::Associative{K,V}) = V
 function merge(d::Associative, others::Associative...)
-    K, V = eltype(d)
+    K, V = keytype(d), valtype(d)
     for other in others
-        (Ko, Vo) = eltype(other)
-        K = promote_type(K, Ko)
-        V = promote_type(V, Vo)
+        K = promote_type(K, keytype(other))
+        V = promote_type(V, valtype(other))
     end
     merge!(Dict{K,V}(), d, others...)
 end

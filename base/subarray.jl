@@ -393,14 +393,15 @@ step_sa(::Integer) = 1
 
 # This might be conservative, but better safe than sorry
 function iscontiguous{T,N,P,I,LD}(::Type{SubArray{T,N,P,I,LD}})
-    LD == length(I) || return false
-    length(I) < 1 && return true
-    I[1] == Colon && return true
-    if I[1] <: UnitRange
+    Ip = I.parameters
+    LD == length(Ip) || return false
+    length(Ip) < 1 && return true
+    Ip[1] == Colon && return true
+    if Ip[1] <: UnitRange
         # It might be stride1 == 1, or this might be because `sub` was
         # used with an integer for the first index
-        for j = 2:length(I)
-            (I[j] == Colon || (I[j] <: AbstractVector)) && return false
+        for j = 2:length(Ip)
+            (Ip[j] == Colon || (Ip[j] <: AbstractVector)) && return false
         end
         return true
     end

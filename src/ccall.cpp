@@ -560,7 +560,6 @@ static Value *emit_cglobal(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
 // llvmcall(ir, (rettypes...), (argtypes...), args...)
 static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
 {
-
     JL_NARGSV(llvmcall, 3)
     jl_value_t *rt = NULL, *at = NULL, *ir = NULL;
     jl_svec_t *stt = NULL;
@@ -601,28 +600,25 @@ static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
     }
     bool isString = jl_is_byte_string(ir);
     bool isPtr = jl_is_cpointer(ir);
-    if (!isString && !isPtr)
-    {
+    if (!isString && !isPtr) {
         jl_error("First argument to llvmcall must be a string or pointer to an LLVM Function");
     }
 
     JL_TYPECHK(llvmcall, type, rt);
-    JL_TYPECHK(llvmcall, simplevector, at);
-    //JL_TYPECHK(llvmcall, type, at);
+    JL_TYPECHK(llvmcall, type, at);
 
     std::stringstream ir_stream;
 
     stt = jl_alloc_svec(nargs - 3);
 
-    for (size_t i = 0; i < nargs-3; ++i)
-    {
+    for (size_t i = 0; i < nargs-3; ++i) {
         jl_svecset(stt,i,expr_type(args[4+i],ctx));
     }
 
     // Generate arguments
     std::string arguments;
     llvm::raw_string_ostream argstream(arguments);
-    jl_svec_t *tt = (jl_svec_t*)at;
+    jl_svec_t *tt = ((jl_datatype_t*)at)->parameters;
     jl_value_t *rtt = rt;
 
     size_t nargt = jl_svec_len(tt);
@@ -633,13 +629,11 @@ static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
      * If the argument type is immutable (including bitstype), we pass the loaded llvm value
      * type. Otherwise we pass a pointer to a jl_value_t.
      */
-    for (size_t i = 0; i < nargt; ++i)
-    {
+    for (size_t i = 0; i < nargt; ++i) {
         jl_value_t *tti = jl_svecref(tt,i);
         Type *t = julia_type_to_llvm(tti);
         argtypes.push_back(t);
-        if (4+i > nargs)
-        {
+        if (4+i > nargs) {
             jl_error("Missing arguments to llvmcall!");
         }
         jl_value_t *argi = args[4+i];
@@ -727,8 +721,7 @@ static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
             assert(*it == f->getFunctionType()->getParamType(i));
 
 #ifdef USE_MCJIT
-        if (f->getParent() != jl_Module)
-        {
+        if (f->getParent() != jl_Module) {
             FunctionMover mover(jl_Module,f->getParent());
             f = mover.CloneFunction(f);
         }
@@ -739,8 +732,7 @@ static Value *emit_llvmcall(jl_value_t **args, size_t nargs, jl_codectx_t *ctx)
         if (verifyFunction(*f,PrintMessageAction)) {
         #else
         llvm::raw_fd_ostream out(1,false);
-        if (verifyFunction(*f,&out))
-        {
+        if (verifyFunction(*f,&out)) {
         #endif
             f->dump();
             jl_error("Malformed LLVM Function");

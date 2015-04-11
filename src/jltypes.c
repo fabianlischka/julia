@@ -1720,10 +1720,10 @@ static int typekey_compare(jl_datatype_t *tt, jl_value_t **key, size_t n)
     size_t tnp = jl_nparams(tt);
     if (n < tnp) return -1;
     if (n > tnp) return 1;
-    // TODO
-    /* if (tn == jl_type_type->name &&
-           (jl_is_typector(key[0]) != jl_is_typector(jl_svecref(tt->parameters,0))))
-           continue; */
+    if (tt->name == jl_type_type->name &&
+        (jl_is_typector(key[0]) != jl_is_typector(jl_tparam0(tt)))) {
+        return jl_is_typector(key[0]) ? 1 : -1;
+    }
     for(j=0; j < n; j++) {
         jl_value_t *tj = jl_svecref(tt->parameters,j);
         jl_value_t *kj = key[j];
