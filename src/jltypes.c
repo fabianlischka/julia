@@ -2211,30 +2211,9 @@ static int jl_subtype_le(jl_value_t *a, jl_value_t *b, int ta, int invariant)
         // Union() <: Union()
         return 1;
     }
-    if (ta) a = (jl_value_t*)jl_typeof(a);
 
     size_t i;
-    if (jl_is_tuple_type(a)) {
-        if (jl_is_datatype(b)) {
-            if (((jl_datatype_t*)b)->name == jl_ntuple_typename) {
-                jl_value_t *tp = jl_tparam1(b);
-                if (tuple_all_subtype((jl_datatype_t*)a, tp, 0, invariant)) {
-                    if (invariant) {
-                        return (jl_datatype_t*)b != jl_ntuple_type ||
-                            jl_subtype_le((jl_value_t*)jl_anytuple_type, a, 0, 1);
-                    }
-                    return 1;
-                }
-                return 0;
-            }
-        }
-        if (jl_is_tuple_type(b)) {
-            return jl_tuple_subtype_(jl_svec_data(((jl_datatype_t*)a)->parameters), jl_nparams(a),
-                                     (jl_datatype_t*)b, 0, invariant);
-        }
-    }
-
-    if (jl_is_uniontype(a)) {
+    if (!ta && jl_is_uniontype(a)) {
         jl_svec_t *ap = ((jl_uniontype_t*)a)->types;
         size_t l_ap = jl_svec_len(ap);
         if (invariant && !jl_is_typevar(b)) {
@@ -2247,7 +2226,7 @@ static int jl_subtype_le(jl_value_t *a, jl_value_t *b, int ta, int invariant)
         return 1;
     }
 
-    if (jl_is_type_type(a) && !invariant) {
+    if (!ta && jl_is_type_type(a) && !invariant) {
         jl_value_t *tp0a = jl_tparam0(a);
         if (jl_is_typevar(tp0a)) {
             jl_value_t *ub = ((jl_tvar_t*)tp0a)->ub;
@@ -2269,10 +2248,32 @@ static int jl_subtype_le(jl_value_t *a, jl_value_t *b, int ta, int invariant)
             return 0;
         jl_svec_t *bp = ((jl_uniontype_t*)b)->types;
         for(i=0; i < jl_svec_len(bp); i++) {
-            if (jl_subtype_le(a, jl_svecref(bp,i), 0, invariant))
+            if (jl_subtype_le(a, jl_svecref(bp,i), ta, invariant))
                 return 1;
         }
         return 0;
+    }
+
+    if (ta) a = (jl_value_t*)jl_typeof(a);
+
+    if (jl_is_tuple_type(a)) {
+        if (jl_is_datatype(b)) {
+            if (((jl_datatype_t*)b)->name == jl_ntuple_typename) {
+                jl_value_t *tp = jl_tparam1(b);
+                if (tuple_all_subtype((jl_datatype_t*)a, tp, 0, invariant)) {
+                    if (invariant) {
+                        return (jl_datatype_t*)b != jl_ntuple_type ||
+                            jl_subtype_le((jl_value_t*)jl_anytuple_type, a, 0, 1);
+                    }
+                    return 1;
+                }
+                return 0;
+            }
+        }
+        if (jl_is_tuple_type(b)) {
+            return jl_tuple_subtype_(jl_svec_data(((jl_datatype_t*)a)->parameters), jl_nparams(a),
+                                     (jl_datatype_t*)b, 0, invariant);
+        }
     }
 
     if (a == b) return 1;

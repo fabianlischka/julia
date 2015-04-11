@@ -727,14 +727,36 @@ function invoke_tfunc(f, types, argtype)
     return Any
 end
 
+# `types` is an array of inferred types for expressions in `args`.
+# if an expression constructs a container (e.g. `svec(x,y,z)`),
+# refine its type to an array of element types. returns an array of
+# arrays of types, or `nothing`.
+function precise_container_types(args, types, vtypes, sv)
+    n = length(args)
+    assert(n == length(types))
+    result = cell(n)
+    for i = 1:n
+        ai = args[i]; ti = types[i]
+        if isa(ai,Expr) && (is_known_call(ai, svec, sv) || is_known_call(ai, tuple, sv))
+            aa = ai.args
+            result[i] = Any[ exprtype(aa[j], sv) for j=2:length(aa) ]
+        elseif ti<:Tuple && (i==n || !isvatuple(ti))
+            result[i] = ti.parameters
+        else
+            return nothing
+        end
+    end
+    return result
+end
+
 # do apply(af, fargs...), where af is a function value
-function abstract_apply(af, aargtypes::Vector{Any}, vtypes, sv, e)
-    if all(x->(x<:Tuple), aargtypes) &&
-        !any(isvatuple, aargtypes[1:(length(aargtypes)-1)])
+function abstract_apply(af, fargs, aargtypes::Vector{Any}, vtypes, sv, e)
+    ctypes = precise_container_types(fargs, aargtypes, vtypes, sv)
+    if ctypes !== nothing
         e.head = :call1
         # apply with known func with known tuple types
         # can be collapsed to a call to the applied func
-        at = append_any(map(t->t.parameters, aargtypes)...)
+        at = append_any(ctypes...)
         return abstract_call(af, (), at, vtypes, sv, ())
     end
     if is(af,tuple) && length(aargtypes)==1
@@ -770,7 +792,7 @@ function abstract_call(f, fargs, argtypes::Vector{Any}, vtypes, sv::StaticVarInf
         if !is(af,false)
             af = _ieval(af)
             if isa(af,Function)
-                return abstract_apply(af, argtypes[3:end], vtypes, sv, e)
+                return abstract_apply(af, fargs[3:end], argtypes[3:end], vtypes, sv, e)
             end
         end
         # TODO: this slows down inference a lot
@@ -781,7 +803,9 @@ function abstract_call(f, fargs, argtypes::Vector{Any}, vtypes, sv::StaticVarInf
             if isa(call_func,Function)
                 aargtypes = Any[ argtypes[i] for i=2:length(argtypes) ]
                 aargtypes[1] = Tuple{aargtypes[1]}  # don't splat "function"
-                return abstract_apply(call_func, aargtypes, vtypes, sv, e)
+                fa = fargs[2:end]
+                fa[1] = Expr(:call, top_tuple, fa[1])
+                return abstract_apply(call_func, fa, aargtypes, vtypes, sv, e)
             end
         end
         return Any
@@ -843,18 +867,9 @@ function abstract_call(f, fargs, argtypes::Vector{Any}, vtypes, sv::StaticVarInf
     return rt
 end
 
-function abstract_eval_arg(a::ANY, vtypes::ANY, sv::StaticVarInfo)
-    t = abstract_eval(a, vtypes, sv)
-    # TODO: 2nd and 3rd clauses here may be unnecessary
-    if isa(t,TypeVar) && t.lb == Bottom && isleaftype(t.ub)
-        t = t.ub
-    end
-    return t
-end
-
 function abstract_eval_call(e, vtypes, sv::StaticVarInfo)
     fargs = e.args[2:end]
-    argtypes = Any[abstract_eval_arg(a, vtypes, sv) for a in fargs]
+    argtypes = Any[abstract_eval(a, vtypes, sv) for a in fargs]
     if any(x->is(x,Bottom), argtypes)
         return Bottom
     end
@@ -1564,7 +1579,7 @@ function typeinf_uncached(linfo::LambdaStaticData, atypes::ANY, sparams::SimpleV
                     end
                 elseif is(hd,:return)
                     pc´ = n+1
-                    rt = abstract_eval_arg(stmt.args[1], s[pc], sv)
+                    rt = abstract_eval(stmt.args[1], s[pc], sv)
                     if frame.recurred
                         rec = true
                         if !(isa(frame.prev,CallStack) && frame.prev.cycleid == frame.cycleid)
@@ -1760,7 +1775,7 @@ function eval_annotate(e::ANY, vtypes::ANY, sv::StaticVarInfo, decls, clo, undef
     if (head === :call || head === :call1) && isa(e.args[1],LambdaStaticData)
         called = e.args[1]
         fargs = e.args[2:end]
-        argtypes = Tuple{[abstract_eval_arg(a, vtypes, sv) for a in fargs]...}
+        argtypes = Tuple{[abstract_eval(a, vtypes, sv) for a in fargs]...}
         # recur inside inner functions once we have all types
         tr,ty = typeinf(called, argtypes, called.sparams, called, false, true)
         called.ast = tr
@@ -2833,7 +2848,7 @@ function inlining_pass(e::Expr, sv, ast)
                     for i = 4:na
                         aarg = e.args[i]
                         t = exprtype(aarg,sv)
-                        if isa(aarg,Expr) && is_known_call(aarg, tuple, sv)
+                        if isa(aarg,Expr) && (is_known_call(aarg, tuple, sv) || is_known_call(aarg, svec, sv))
                             # apply(f,tuple(x,y,...)) => f(x,y,...)
                             newargs[i-3] = aarg.args[2:end]
                         elseif isa(aarg, Tuple)
@@ -3217,7 +3232,7 @@ function replace_getfield!(ast, e::ANY, tupname, vals, sv, i0)
 end
 
 code_typed(f, types::ANY; optimize=true) =
-    code_typed(call, Tuple{isa(f,Type)?Type{f}:typeof(f), types...}, optimize=optimize)
+    code_typed(call, Tuple{isa(f,Type)?Type{f}:typeof(f), types.parameters...}, optimize=optimize)
 function code_typed(f::Function, types::ANY; optimize=true)
     asts = []
     for x in _methods(f,types,-1)
@@ -3236,7 +3251,7 @@ function code_typed(f::Function, types::ANY; optimize=true)
     asts
 end
 
-return_types(f, types::ANY) = return_types(call, Tuple{isa(f,Type)?Type{f}:typeof(f), types...})
+return_types(f, types::ANY) = return_types(call, Tuple{isa(f,Type)?Type{f}:typeof(f), types.parameters...})
 function return_types(f::Function, types::ANY)
     rt = []
     for x in _methods(f,types,-1)

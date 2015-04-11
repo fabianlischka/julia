@@ -184,7 +184,7 @@ function which(f::ANY, t::Type)
         ms[1]
     else
         if !isa(f,Function)
-            t = tuple(isa(f,Type) ? Type{f} : typeof(f), t...)
+            t = tuple(isa(f,Type) ? Type{f} : typeof(f), t.parameters...)
             f = call
         elseif !isgeneric(f)
             throw(ArgumentError("argument is not a generic function"))

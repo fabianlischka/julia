@@ -1824,24 +1824,22 @@ static Value *emit_f_is(jl_value_t *rt1, jl_value_t *rt2,
             answer = builder.CreateICmpEQ(JL_INT(varg1),JL_INT(varg2));
             goto done;
         }
-        bool isStruct = at1->isStructTy();
-        if ((isStruct || at1->isVectorTy()) && !ptr_comparable) {
+        bool isStructOrArray = at1->isStructTy() || at1->isArrayTy();
+        if ((isStructOrArray || at1->isVectorTy()) && !ptr_comparable) {
             assert(jl_is_datatype(rt1));
             jl_svec_t *types = ((jl_datatype_t*)rt1)->types;
             answer = ConstantInt::get(T_int1, 1);
             size_t l = jl_svec_len(types);
-            unsigned j = 0;
             for(unsigned i=0; i < l; i++) {
                 jl_value_t *fldty = jl_svecref(types,i);
                 Value *subAns;
-                if (isStruct) {
+                if (isStructOrArray) {
                     if (julia_type_to_llvm(fldty) != T_void) {
                         subAns =
                             emit_f_is(fldty, fldty, NULL, NULL,
-                                      builder.CreateExtractValue(varg1, ArrayRef<unsigned>(&j,1)),
-                                      builder.CreateExtractValue(varg2, ArrayRef<unsigned>(&j,1)),
+                                      builder.CreateExtractValue(varg1, ArrayRef<unsigned>(&i,1)),
+                                      builder.CreateExtractValue(varg2, ArrayRef<unsigned>(&i,1)),
                                       ctx);
-                        j++;
                     }
                     else {
                         continue;
@@ -2665,7 +2663,8 @@ static Value *emit_var(jl_sym_t *sym, jl_value_t *ty, jl_codectx_t *ctx, bool is
     return emit_checked_var(bp, sym, ctx, vi.isVolatile);
 }
 
-static Value *emit_assignment(Value *bp, jl_value_t *r, jl_value_t *declType, bool isVolatile, bool used, jl_codectx_t *ctx) {
+static Value *emit_assignment(Value *bp, jl_value_t *r, jl_value_t *declType, bool isVolatile, bool used, jl_codectx_t *ctx)
+{
     Value *rval;
     jl_value_t *rt = expr_type(r,ctx);
     if (bp != NULL) {
@@ -2747,7 +2746,7 @@ static void emit_assignment(jl_value_t *l, jl_value_t *r, jl_codectx_t *ctx)
                             literal_pointer_val(bnd),
                             rval);
         // Global variable. Does not need debug info because the debugger knows about
-        // it's memory location.
+        // its memory location.
     }
     else {
         jl_varinfo_t &vi = ctx->vars[s];

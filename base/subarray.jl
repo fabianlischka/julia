@@ -332,11 +332,11 @@ function tailsize(P, d)
 end
 
 stagedfunction linearindexing{T,N,P,I,LD}(A::SubArray{T,N,P,I,LD})
-    length(I) == LD ? (:(LinearFast())) : (:(LinearSlow()))
+    length(I.parameters) == LD ? (:(LinearFast())) : (:(LinearSlow()))
 end
 stagedfunction linearindexing{A<:SubArray}(::Type{A})
     T,N,P,I,LD = A.parameters
-    length(I) == LD ? (:(LinearFast())) : (:(LinearSlow()))
+    length(I.parameters) == LD ? (:(LinearFast())) : (:(LinearSlow()))
 end
 
 getindex(::Colon, ::Colon) = Colon()
